@@ -26,4 +26,7 @@
 - **护栏原则**:合规红黄绿灯与利润公式是**确定性**的(在 `agents/compliance.py`、`agents/profit.py`),
   LLM 不参与核心判定。改逻辑要改这两处的规则/公式,并同步更新 `tests/`。
 - `data/*.json` 是**演示用示例数据**,不是真实数据源。真实接入时替换为选品 API、合规规则库、实时费率。
+  取数层已隔离在 `datastore.py`(选品/合规/费率),接真实源只需改这三个 load 函数,Agent 逻辑不变。
+- **实时汇率**是目前唯一接入的真实数据源(`rates.py`,免费源 open.er-api.com / jsdelivr,带 1h 缓存)。
+  需要对外网络;网络不可用时自动降级为 `DEFAULT_CNY_PER_USD=7.2`,不会中断主流程。测试用 monkeypatch,不依赖真实网络。
 - 结论阈值(利润红线 10%、健康线 20%、红海竞争 0.8)集中在 `orchestrator.py` 顶部常量。

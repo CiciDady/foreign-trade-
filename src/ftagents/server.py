@@ -20,6 +20,7 @@ from .datastore import load_products
 from .llm import LLMClient
 from .models import MarketContext, ProductCandidate
 from .orchestrator import NoCandidatesError, analyze_product, run_pipeline
+from .rates import DEFAULT_CNY_PER_USD, get_cny_per_usd
 
 _STATIC = Path(__file__).parent / "static"
 
@@ -29,11 +30,13 @@ def list_categories() -> list[str]:
 
 
 def _context(payload: dict, category: str) -> MarketContext:
+    rate = payload.get("cny_per_usd")
+    cny = float(rate) if rate else get_cny_per_usd()[0]
     return MarketContext(
         category=category,
         market=str(payload.get("market", "US")).strip() or "US",
         budget_usd=float(payload.get("budget") or 5000),
-        cny_per_usd=float(payload.get("cny_per_usd") or 7.2),
+        cny_per_usd=cny,
     )
 
 
@@ -139,6 +142,10 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/categories":
             self._json(200, {"categories": list_categories(), "llm": llm_status()})
+            return
+        if self.path == "/api/fx":
+            rate, source = get_cny_per_usd()
+            self._json(200, {"cny_per_usd": rate, "source": source, "live": source != "fallback"})
             return
         if self.path == "/api/health":
             self._json(200, {"ok": True})

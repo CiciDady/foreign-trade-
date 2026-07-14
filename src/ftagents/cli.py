@@ -14,6 +14,7 @@ import sys
 from .datastore import load_products
 from .models import MarketContext, PipelineResult, ScoredCandidate, Verdict
 from .orchestrator import NoCandidatesError, run_pipeline
+from .rates import get_cny_per_usd
 
 _VERDICT_LABEL = {
     Verdict.GO: "✅ 可以做 (GO)",
@@ -97,7 +98,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--category", "-c", help="目标品类,如 'bluetooth earbuds'")
     parser.add_argument("--market", "-m", default="US", help="目标市场 (US/EU/UK),默认 US")
     parser.add_argument("--budget", "-b", type=float, default=5000.0, help="启动预算(美元),默认 5000")
-    parser.add_argument("--cny-per-usd", type=float, default=7.2, help="人民币兑美元汇率,默认 7.2")
+    parser.add_argument(
+        "--cny-per-usd",
+        type=float,
+        default=None,
+        help="人民币兑美元汇率;不填则自动获取实时汇率(失败降级 7.2)",
+    )
     parser.add_argument("--json", action="store_true", help="以 JSON 输出")
     parser.add_argument("--no-llm", action="store_true", help="强制不使用 LLM(纯确定性)")
     parser.add_argument("--interactive", action="store_true", help="交互式选择候选(人工定案)")
@@ -119,11 +125,18 @@ def main(argv: list[str] | None = None) -> int:
         print("错误:请用 --category 指定品类,或用 --list-categories 查看示例。", file=sys.stderr)
         return 2
 
+    if args.cny_per_usd is not None:
+        cny = args.cny_per_usd
+    else:
+        cny, source = get_cny_per_usd()
+        note = "实时" if source != "fallback" else "默认(取汇率失败)"
+        print(f"汇率 {cny} ¥/$ [{note} · {source}]")
+
     ctx = MarketContext(
         category=args.category,
         market=args.market,
         budget_usd=args.budget,
-        cny_per_usd=args.cny_per_usd,
+        cny_per_usd=cny,
     )
     selector = _interactive_selector if args.interactive else None
 

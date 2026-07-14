@@ -50,10 +50,14 @@ python -m ftagents.server --host 127.0.0.1 --port 8000
 
 结果卡片右上角支持**导出**:单个报告导 JSON / Markdown,批量对比导 CSV。
 
+**实时汇率**:页面加载时自动获取实时人民币汇率(免费源 open.er-api.com,失败降级 7.2),
+`汇率` 字段旁标注来源;CLI 不加 `--cny-per-usd` 时同样自动取实时汇率。
+
 接口:
 - `GET  /api/categories` 返回示例品类 + LLM 是否可用
+- `GET  /api/fx` 返回实时汇率 `{cny_per_usd, source, live}`(失败降级)
 - `POST /api/analyze` 入参 `{category, market, budget, cny_per_usd, use_llm}`;
-  传入可选 `product` 对象即进入**手动测算**模式(跳过选品数据源)。
+  传入可选 `product` 对象即进入**手动测算**模式(跳过选品数据源);`cny_per_usd` 省略时用实时汇率。
 - `POST /api/compare` 入参 `{categories:[...], market, budget, cny_per_usd, use_llm}`,返回排序后的对比数组。
 
 ### 接入 LLM(可选,DeepSeek 兼容)
@@ -84,6 +88,7 @@ src/ftagents/
   cli.py             # 命令行入口
   server.py          # 标准库 Web 服务(API + 单页 UI)
   static/index.html  # Web 单页界面
+  rates.py           # 实时汇率(免费源 + 缓存 + 降级)
   data/*.json        # 示例数据(真实项目替换为 API/规则库)
 tests/               # pytest 用例
 docs/                # 业务分析与方案讨论记录

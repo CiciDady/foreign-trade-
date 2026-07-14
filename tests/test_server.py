@@ -39,6 +39,19 @@ def test_index_and_categories():
         httpd.server_close()
 
 
+def test_fx_endpoint_structure():
+    httpd, port = _start()
+    try:
+        base = f"http://127.0.0.1:{port}"
+        data = json.loads(urllib.request.urlopen(base + "/api/fx", timeout=15).read())
+        assert data["cny_per_usd"] > 0
+        assert isinstance(data["source"], str)
+        assert "live" in data
+    finally:
+        httpd.shutdown()
+        httpd.server_close()
+
+
 def test_analyze_endpoint():
     httpd, port = _start()
     try:

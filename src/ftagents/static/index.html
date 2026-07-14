@@ -125,7 +125,7 @@
             <input type="number" id="budget" value="5000" min="0" step="100" />
           </div>
           <div>
-            <label for="cny">汇率(¥/$)</label>
+            <label for="cny">汇率(¥/$) <span id="fxNote" style="color:var(--muted);font-weight:400"></span></label>
             <input type="number" id="cny" value="7.2" min="1" step="0.01" />
           </div>
         </div>
@@ -395,8 +395,19 @@ document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
 $("runSingle").onclick = runSingle;
 $("runManual").onclick = runManual;
 $("runCompare").onclick = runCompare;
+async function loadFx() {
+  try {
+    const fx = await (await fetch("/api/fx")).json();
+    if (fx && fx.cny_per_usd) {
+      $("cny").value = fx.cny_per_usd;
+      $("fxNote").textContent = fx.live ? `实时 · ${fx.source}` : "默认(取汇率失败)";
+    }
+  } catch (e) {}
+}
+
 $("category").addEventListener("keydown", e => { if (e.key === "Enter") runSingle(); });
 loadCategories();
+loadFx();
 </script>
 </body>
 </html>
