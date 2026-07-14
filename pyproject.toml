@@ -16,12 +16,13 @@ dev = ["pytest>=8"]
 
 [project.scripts]
 ftagents = "ftagents.cli:main"
+ftagents-web = "ftagents.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-ftagents = ["data/*.json"]
+ftagents = ["data/*.json", "static/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

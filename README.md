@@ -33,6 +33,19 @@ python -m ftagents.cli -c "yoga mat" -m EU --json
 python -m ftagents.cli -c "bluetooth earbuds" --interactive
 ```
 
+### Web 界面(交互验证)
+
+```bash
+python -m ftagents.server --host 127.0.0.1 --port 8000
+# 或安装后:ftagents-web --port 8000
+```
+
+浏览器打开 http://127.0.0.1:8000 :选品类/市场/预算,勾选是否用 LLM,点「分析」即可看到
+色标结论(GO/CAUTION/NO-GO)、利润指标、成本构成、合规待办与决策摘要。
+
+- `GET  /api/categories` 返回示例品类 + LLM 是否可用
+- `POST /api/analyze` 入参 `{category, market, budget, cny_per_usd, use_llm}`,返回完整结果 JSON
+
 ### 接入 LLM(可选,DeepSeek 兼容)
 
 不配置 key 时自动降级为模板摘要,闭环照常运行。配置后自动增强:
@@ -59,6 +72,8 @@ src/ftagents/
   agents/            # 选品 / 合规 / 利润测算 三个 Agent
   orchestrator.py    # 流水线编排 + 人工定案 + 综合结论
   cli.py             # 命令行入口
+  server.py          # 标准库 Web 服务(API + 单页 UI)
+  static/index.html  # Web 单页界面
   data/*.json        # 示例数据(真实项目替换为 API/规则库)
 tests/               # pytest 用例
 docs/                # 业务分析与方案讨论记录

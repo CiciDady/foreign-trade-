@@ -11,6 +11,11 @@
 - 开发在 **虚拟环境 `.venv`** 中进行:`. .venv/bin/activate`。启动时的 update script 已负责
   创建 `.venv` 并 `pip install -e ".[dev]"`(仅当 `pyproject.toml` 存在时执行)。
 - 运行时**无第三方依赖**(纯标准库);`pytest` 是唯一开发依赖。
+- 两种入口:CLI(`python -m ftagents.cli`)与 Web(`python -m ftagents.server`,默认
+  `127.0.0.1:8000`,单页 UI + `/api/analyze`)。二者共享同一套 orchestrator 逻辑。
+- **Web 服务读取环境变量 LLM key**:若用 tmux 起服务,注意 tmux server 只继承"首个客户端"的
+  环境。要让 `/api/categories` 显示 `llm.available=true`,需在已带 `DEEPSEEK_API_KEY` 的 shell 里
+  (必要时先 `tmux kill-server`)重新创建 tmux 会话,或直接在带 key 的 shell 里前台/后台启动。
 - 系统依赖:`python3.12-venv`(创建 venv 所需)。已在环境中安装;若未来 pod 缺失,
   需 `apt-get install -y python3.12-venv` 后再建 venv。它**不应**进 update script(系统依赖)。
 
