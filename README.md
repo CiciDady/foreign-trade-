@@ -40,11 +40,21 @@ python -m ftagents.server --host 127.0.0.1 --port 8000
 # 或安装后:ftagents-web --port 8000
 ```
 
-浏览器打开 http://127.0.0.1:8000 :选品类/市场/预算,勾选是否用 LLM,点「分析」即可看到
-色标结论(GO/CAUTION/NO-GO)、利润指标、成本构成、合规待办与决策摘要。
+浏览器打开 http://127.0.0.1:8000,顶部为全局参数(市场/预算/汇率/是否用 LLM),下面三个 Tab:
 
+1. **选品分析**:输入品类 → 从示例数据源选出机会最高的候选并给结论。
+2. **手动测算**:手动填真实商品参数(供货价/重量/售价/月销/竞争度 + 电池·利器等属性、侵权风险),
+   直接算落地利润与合规——用于把真实询价立刻套进来测算。
+3. **批量对比**:多选品类一次性对比,输出按机会分排序的表格(色标结论 + 利润/ROI/合规),
+   点某一行可下钻查看完整报告。
+
+结果卡片右上角支持**导出**:单个报告导 JSON / Markdown,批量对比导 CSV。
+
+接口:
 - `GET  /api/categories` 返回示例品类 + LLM 是否可用
-- `POST /api/analyze` 入参 `{category, market, budget, cny_per_usd, use_llm}`,返回完整结果 JSON
+- `POST /api/analyze` 入参 `{category, market, budget, cny_per_usd, use_llm}`;
+  传入可选 `product` 对象即进入**手动测算**模式(跳过选品数据源)。
+- `POST /api/compare` 入参 `{categories:[...], market, budget, cny_per_usd, use_llm}`,返回排序后的对比数组。
 
 ### 接入 LLM(可选,DeepSeek 兼容)
 

@@ -14,6 +14,31 @@ _W_COMPETITION = 0.3
 _W_MARGIN = 0.3
 
 
+def score_candidate(
+    product: ProductCandidate, ctx: MarketContext, max_sales: int
+) -> ScoredCandidate:
+    """对单个商品打分。``max_sales`` 用于需求归一化(同一批次内取最大值)。"""
+
+    supplier_usd = product.supplier_cost_cny / ctx.cny_per_usd
+    demand = product.est_monthly_sales / max_sales if max_sales else 0.0
+    demand = min(1.0, max(0.0, demand))
+    margin_proxy = 0.0
+    if product.target_price_usd > 0:
+        margin_proxy = max(0.0, (product.target_price_usd - supplier_usd) / product.target_price_usd)
+    opportunity = (
+        _W_DEMAND * demand
+        + _W_COMPETITION * (1.0 - product.competition_score)
+        + _W_MARGIN * margin_proxy
+    )
+    return ScoredCandidate(
+        product=product,
+        demand_score=round(demand, 4),
+        competition_score=product.competition_score,
+        margin_proxy=round(margin_proxy, 4),
+        opportunity_score=round(opportunity, 4),
+    )
+
+
 class SourcingAgent:
     def __init__(self, products: list[ProductCandidate] | None = None) -> None:
         self._products = products if products is not None else load_products()
@@ -33,29 +58,6 @@ class SourcingAgent:
             return []
 
         max_sales = max(p.est_monthly_sales for p in candidates) or 1
-        scored: list[ScoredCandidate] = []
-        for p in candidates:
-            supplier_usd = p.supplier_cost_cny / ctx.cny_per_usd
-            demand = p.est_monthly_sales / max_sales
-            margin_proxy = 0.0
-            if p.target_price_usd > 0:
-                margin_proxy = max(
-                    0.0, (p.target_price_usd - supplier_usd) / p.target_price_usd
-                )
-            opportunity = (
-                _W_DEMAND * demand
-                + _W_COMPETITION * (1.0 - p.competition_score)
-                + _W_MARGIN * margin_proxy
-            )
-            scored.append(
-                ScoredCandidate(
-                    product=p,
-                    demand_score=round(demand, 4),
-                    competition_score=p.competition_score,
-                    margin_proxy=round(margin_proxy, 4),
-                    opportunity_score=round(opportunity, 4),
-                )
-            )
-
+        scored = [score_candidate(p, ctx, max_sales) for p in candidates]
         scored.sort(key=lambda s: s.opportunity_score, reverse=True)
         return scored

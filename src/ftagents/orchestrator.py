@@ -9,12 +9,14 @@ from __future__ import annotations
 from typing import Callable
 
 from .agents import ComplianceAgent, ProfitAgent, SourcingAgent
+from .agents.sourcing import score_candidate
 from .llm import LLMClient
 from .models import (
     ComplianceResult,
     ComplianceStatus,
     MarketContext,
     PipelineResult,
+    ProductCandidate,
     ProfitResult,
     Recommendation,
     ScoredCandidate,
@@ -111,20 +113,15 @@ def _llm_summary(llm: LLMClient, result_parts: dict) -> str | None:
     return llm.complete(prompt)
 
 
-def run_pipeline(
+def analyze_scored(
     ctx: MarketContext,
+    chosen: ScoredCandidate,
     *,
-    selector: Selector | None = None,
+    alternatives: list[ScoredCandidate] | None = None,
     use_llm: bool = True,
     llm: LLMClient | None = None,
 ) -> PipelineResult:
-    sourcing = SourcingAgent()
-    scored_all = sourcing.run(ctx)
-    if not scored_all:
-        raise NoCandidatesError(f"没有匹配品类「{ctx.category}」的候选商品")
-
-    selector = selector or _default_selector
-    chosen = selector(scored_all)
+    """对一个已选定商品跑合规 + 利润测算 + 综合结论 + 摘要。"""
 
     compliance = ComplianceAgent().run(chosen.product, ctx)
     profit = ProfitAgent().run(chosen.product, ctx)
@@ -142,7 +139,6 @@ def run_pipeline(
     if not summary:
         summary = _template_summary(parts)
 
-    alternatives = [s for s in scored_all if s is not chosen]
     return PipelineResult(
         context=ctx,
         scored_candidate=chosen,
@@ -150,6 +146,39 @@ def run_pipeline(
         profit=profit,
         recommendation=rec,
         summary=summary,
-        ranked_alternatives=alternatives,
+        ranked_alternatives=alternatives or [],
         llm_used=llm_used,
     )
+
+
+def run_pipeline(
+    ctx: MarketContext,
+    *,
+    selector: Selector | None = None,
+    use_llm: bool = True,
+    llm: LLMClient | None = None,
+) -> PipelineResult:
+    sourcing = SourcingAgent()
+    scored_all = sourcing.run(ctx)
+    if not scored_all:
+        raise NoCandidatesError(f"没有匹配品类「{ctx.category}」的候选商品")
+
+    selector = selector or _default_selector
+    chosen = selector(scored_all)
+    alternatives = [s for s in scored_all if s is not chosen]
+    return analyze_scored(
+        ctx, chosen, alternatives=alternatives, use_llm=use_llm, llm=llm
+    )
+
+
+def analyze_product(
+    ctx: MarketContext,
+    product: ProductCandidate,
+    *,
+    use_llm: bool = True,
+    llm: LLMClient | None = None,
+) -> PipelineResult:
+    """手动测算:直接对用户输入的商品参数跑闭环(跳过选品数据源)。"""
+
+    scored = score_candidate(product, ctx, max_sales=max(product.est_monthly_sales, 1))
+    return analyze_scored(ctx, scored, alternatives=[], use_llm=use_llm, llm=llm)

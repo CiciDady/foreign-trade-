@@ -18,8 +18,8 @@ from pathlib import Path
 
 from .datastore import load_products
 from .llm import LLMClient
-from .models import MarketContext
-from .orchestrator import NoCandidatesError, run_pipeline
+from .models import MarketContext, ProductCandidate
+from .orchestrator import NoCandidatesError, analyze_product, run_pipeline
 
 _STATIC = Path(__file__).parent / "static"
 
@@ -28,15 +28,85 @@ def list_categories() -> list[str]:
     return sorted({p.category for p in load_products()})
 
 
-def analyze(payload: dict) -> dict:
-    ctx = MarketContext(
-        category=str(payload.get("category", "")).strip(),
+def _context(payload: dict, category: str) -> MarketContext:
+    return MarketContext(
+        category=category,
         market=str(payload.get("market", "US")).strip() or "US",
         budget_usd=float(payload.get("budget") or 5000),
         cny_per_usd=float(payload.get("cny_per_usd") or 7.2),
     )
-    result = run_pipeline(ctx, use_llm=bool(payload.get("use_llm", False)))
-    return result.to_dict()
+
+
+def _build_manual_product(spec: dict, category: str) -> ProductCandidate:
+    return ProductCandidate(
+        id="MANUAL",
+        name=str(spec.get("name") or category or "自定义商品"),
+        category=category,
+        supplier_cost_cny=float(spec.get("supplier_cost_cny") or 0),
+        weight_kg=float(spec.get("weight_kg") or 0),
+        est_monthly_sales=int(float(spec.get("est_monthly_sales") or 0)),
+        target_price_usd=float(spec.get("target_price_usd") or 0),
+        competition_score=float(spec.get("competition_score") if spec.get("competition_score") is not None else 0.5),
+        hazmat=list(spec.get("hazmat") or []),
+        brand_risk=bool(spec.get("brand_risk", False)),
+        markets=[],
+    )
+
+
+def analyze(payload: dict) -> dict:
+    use_llm = bool(payload.get("use_llm", False))
+    manual = payload.get("product")
+    if manual:
+        category = str(payload.get("category", "")).strip()
+        product = _build_manual_product(manual, category)
+        ctx = _context(payload, category)
+        return analyze_product(ctx, product, use_llm=use_llm).to_dict()
+
+    ctx = _context(payload, str(payload.get("category", "")).strip())
+    return run_pipeline(ctx, use_llm=use_llm).to_dict()
+
+
+def compare(payload: dict) -> dict:
+    """批量对比多个品类,返回按机会分排序的紧凑结果数组。
+
+    批量默认不走 LLM(慢且耗 token),单个展开时再按需增强。
+    """
+
+    categories = payload.get("categories") or []
+    use_llm = bool(payload.get("use_llm", False))
+    rows: list[dict] = []
+    for cat in categories:
+        cat = str(cat).strip()
+        if not cat:
+            continue
+        ctx = _context(payload, cat)
+        try:
+            result = run_pipeline(ctx, use_llm=use_llm)
+        except NoCandidatesError:
+            rows.append({"category": cat, "error": "无匹配候选"})
+            continue
+        p = result.scored_candidate
+        rows.append(
+            {
+                "category": cat,
+                "product": p.product.name,
+                "market": ctx.normalized_market(),
+                "verdict": result.recommendation.verdict.value,
+                "opportunity_score": p.opportunity_score,
+                "margin_pct": result.profit.margin_pct,
+                "unit_profit": result.profit.unit_profit,
+                "monthly_profit": result.profit.monthly_profit,
+                "roi_pct": result.profit.roi_pct,
+                "compliance": result.compliance.status.value,
+                "blocking": result.compliance.blocking,
+            }
+        )
+
+    def _sort_key(r: dict):
+        return (0 if "error" in r else 1, r.get("opportunity_score", 0))
+
+    rows.sort(key=_sort_key, reverse=True)
+    return {"rows": rows}
 
 
 def llm_status() -> dict:
@@ -76,7 +146,7 @@ class Handler(BaseHTTPRequestHandler):
         self._json(404, {"error": "not found"})
 
     def do_POST(self) -> None:  # noqa: N802
-        if self.path != "/api/analyze":
+        if self.path not in ("/api/analyze", "/api/compare"):
             self._json(404, {"error": "not found"})
             return
         try:
@@ -85,13 +155,24 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, TypeError):
             self._json(400, {"error": "请求体不是合法 JSON"})
             return
-        if not str(payload.get("category", "")).strip():
-            self._json(400, {"error": "请填写品类 (category)"})
-            return
+
         try:
+            if self.path == "/api/compare":
+                if not payload.get("categories"):
+                    self._json(400, {"error": "请至少选择一个品类"})
+                    return
+                self._json(200, compare(payload))
+                return
+
+            # /api/analyze
+            if not str(payload.get("category", "")).strip():
+                self._json(400, {"error": "请填写品类 (category)"})
+                return
             self._json(200, analyze(payload))
         except NoCandidatesError as exc:
             self._json(404, {"error": str(exc)})
+        except (ValueError, TypeError) as exc:
+            self._json(400, {"error": f"参数错误: {exc}"})
         except Exception as exc:  # pragma: no cover - defensive
             self._json(500, {"error": f"内部错误: {exc}"})
 
