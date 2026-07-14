@@ -11,6 +11,7 @@
 | 2026-07-14 | 多 Agent 协同方案 + 市面同类产品调研 | [多agent协同方案与市面调研.md](./多agent协同方案与市面调研.md) | `cursor/agent-architecture-notes-b336` · PR #3 | 方案完成,待决策 |
 | 2026-07-14 | Agent 通路串联 + 收费/Token 成本对比(买 vs 自建) | [agent通路与成本对比.md](./agent通路与成本对比.md) | `cursor/agent-cost-comparison-b336` · PR #4 | 分析完成,待决策 |
 | 2026-07-14 | A1/B1/C 三方案具体操作步骤 | [三方案操作步骤.md](./三方案操作步骤.md) | `cursor/three-plans-steps-b336` · PR #5 | 步骤完成,待决策 |
+| 2026-07-14 | 方案 C 落地:最小闭环多 Agent 原型(代码) | 代码见 `src/ftagents/`(参见根目录 `README.md`) | `cursor/self-build-agent-mvp-b336` · PR #6 | 原型可运行,测试通过 |
 
 ## 当前待决策事项(滚动更新)
 
