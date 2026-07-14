@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>外贸选品决策 · 多 Agent 闭环</title>
+<style>
+  :root {
+    --panel: #ffffff; --muted: #64748b; --line: #e2e8f0;
+    --brand: #2563eb; --brand-dark: #1d4ed8;
+    --green: #16a34a; --green-bg: #dcfce7;
+    --amber: #d97706; --amber-bg: #fef3c7;
+    --red: #dc2626; --red-bg: #fee2e2;
+    --ink: #0f172a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+      "Microsoft YaHei", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: linear-gradient(160deg, #0f172a 0%, #1e293b 45%, #334155 100%);
+    min-height: 100vh;
+  }
+  header { padding: 26px 24px 16px; color: #fff; text-align: center; }
+  header h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: .5px; }
+  header p { margin: 0; color: #cbd5e1; font-size: 14px; }
+  .wrap {
+    max-width: 1180px; margin: 0 auto; padding: 8px 20px 48px;
+    display: grid; grid-template-columns: 380px 1fr; gap: 20px;
+  }
+  @media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border-radius: 16px; padding: 22px; box-shadow: 0 10px 30px rgba(2,6,23,.25); }
+  .card h2 { margin: 0 0 14px; font-size: 16px; }
+  label { display: block; font-size: 13px; color: var(--muted); margin: 12px 0 6px; }
+  input[type=text], input[type=number], select {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px;
+    font-size: 14px; outline: none; background: #fff;
+  }
+  input:focus, select:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(37,99,235,.15); }
+  .row { display: flex; gap: 12px; }
+  .row > div { flex: 1; }
+  .quick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip { border: 1px solid var(--line); background: #f8fafc; color: #334155; border-radius: 999px; padding: 5px 11px; font-size: 12px; cursor: pointer; }
+  .chip:hover { border-color: var(--brand); color: var(--brand); }
+  .switch { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: #334155; }
+  button.primary { margin-top: 18px; width: 100%; padding: 12px; border: 0; border-radius: 10px; background: var(--brand); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+  button.primary:hover { background: var(--brand-dark); }
+  button.primary:disabled { opacity: .6; cursor: not-allowed; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .llm-badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #eef2ff; color: #4338ca; }
+  .global { background:#f8fafc; border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  /* tabs */
+  .tabs { display: flex; gap: 6px; margin: 16px 0 4px; border-bottom: 2px solid var(--line); }
+  .tab { padding: 8px 12px; font-size: 14px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -2px; }
+  .tab.active { color: var(--brand); border-bottom-color: var(--brand); font-weight: 600; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .checklist { display: grid; grid-template-columns: 1fr; gap: 6px; max-height: 210px; overflow:auto; border:1px solid var(--line); border-radius:10px; padding:10px; }
+  .checklist label { margin: 0; color: #334155; font-size: 13px; display:flex; align-items:center; gap:8px; }
+  .flags { display:flex; flex-wrap:wrap; gap:12px; margin-top:8px; font-size:13px; color:#334155;}
+  .flags label { margin:0; display:flex; gap:6px; align-items:center; }
+  /* results */
+  .empty { color: var(--muted); text-align: center; padding: 60px 10px; }
+  .toolbar { display:flex; justify-content:flex-end; gap:8px; margin-bottom:12px; }
+  .btn-ghost { border:1px solid var(--line); background:#f8fafc; color:#334155; border-radius:8px; padding:6px 12px; font-size:12px; cursor:pointer; }
+  .btn-ghost:hover { border-color: var(--brand); color: var(--brand); }
+  .verdict { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-radius: 12px; font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+  .verdict small { font-weight: 500; font-size: 13px; opacity: .8; }
+  .go { background: var(--green-bg); color: var(--green); }
+  .caution { background: var(--amber-bg); color: var(--amber); }
+  .nogo { background: var(--red-bg); color: var(--red); }
+  .reasons { margin: 4px 0 18px; padding-left: 18px; color: #334155; font-size: 13px; }
+  .metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 18px; }
+  @media (max-width: 560px) { .metrics { grid-template-columns: repeat(2,1fr); } }
+  .metric { background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .metric .v { font-size: 20px; font-weight: 700; }
+  .metric .k { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .sec-title { font-size: 13px; font-weight: 700; margin: 18px 0 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 7px 8px; border-bottom: 1px dashed var(--line); text-align: left; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.neg { color: var(--green); }
+  .pill { display: inline-block; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+  .pill.GREEN { background: var(--green-bg); color: var(--green); }
+  .pill.YELLOW { background: var(--amber-bg); color: var(--amber); }
+  .pill.RED { background: var(--red-bg); color: var(--red); }
+  .pill.GO { background: var(--green-bg); color: var(--green); }
+  .pill.CAUTION { background: var(--amber-bg); color: var(--amber); }
+  .pill.NO-GO { background: var(--red-bg); color: var(--red); }
+  ul.todos { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: #334155; }
+  .alts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .alt { font-size: 12px; background: #f1f5f9; border-radius: 8px; padding: 5px 9px; color: #475569; }
+  .summary { background: #f8fafc; border: 1px solid var(--line); border-radius: 12px; padding: 14px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+  .summary .top { display:flex; justify-content: flex-end; margin-bottom: 6px; }
+  .error { background: var(--red-bg); color: var(--red); padding: 14px; border-radius: 12px; font-size: 14px; }
+  .spinner { width: 22px; height: 22px; border: 3px solid #e2e8f0; border-top-color: var(--brand); border-radius: 50%; animation: spin .8s linear infinite; margin: 40px auto; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover td { background: #f8fafc; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>外贸选品决策 · 多 Agent 闭环</h1>
+    <p>选品 → 合规 → 利润测算,一键得出「能不能做 + 落地利润 + 合规待办」</p>
+  </header>
+
+  <div class="wrap">
+    <div class="card">
+      <h2>输入条件</h2>
+
+      <div class="global">
+        <div class="row">
+          <div>
+            <label for="market">目标市场</label>
+            <select id="market">
+              <option value="US">美国 (US)</option>
+              <option value="EU">欧盟 (EU)</option>
+              <option value="UK">英国 (UK)</option>
+            </select>
+          </div>
+          <div>
+            <label for="budget">启动预算 ($)</label>
+            <input type="number" id="budget" value="5000" min="0" step="100" />
+          </div>
+          <div>
+            <label for="cny">汇率(¥/$) <span id="fxNote" style="color:var(--muted);font-weight:400"></span></label>
+            <input type="number" id="cny" value="7.2" min="1" step="0.01" />
+          </div>
+        </div>
+        <label class="switch"><input type="checkbox" id="useLlm" /> 使用 LLM 摘要(DeepSeek)<span id="llmState" class="llm-badge" style="display:none"></span></label>
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" data-tab="single">选品分析</div>
+        <div class="tab" data-tab="manual">手动测算</div>
+        <div class="tab" data-tab="compare">批量对比</div>
+      </div>
+
+      <!-- 选品分析 -->
+      <div class="panel active" id="panel-single">
+        <label for="category">目标品类</label>
+        <input type="text" id="category" list="catlist" placeholder="如 bluetooth earbuds" />
+        <datalist id="catlist"></datalist>
+        <div class="quick" id="quick"></div>
+        <button class="primary" id="runSingle">分析</button>
+        <div class="hint">从示例数据源里选出机会最高的候选并给出结论。</div>
+      </div>
+
+      <!-- 手动测算 -->
+      <div class="panel" id="panel-manual">
+        <label for="mName">商品名称</label>
+        <input type="text" id="mName" placeholder="如 便携榨汁杯" />
+        <label for="mCategory">品类(用于合规判定)</label>
+        <select id="mCategory"></select>
+        <div class="grid2">
+          <div><label for="mCost">供货价(¥)</label><input type="number" id="mCost" value="40" min="0" step="1" /></div>
+          <div><label for="mWeight">重量(kg)</label><input type="number" id="mWeight" value="0.5" min="0" step="0.05" /></div>
+          <div><label for="mPrice">目标售价($)</label><input type="number" id="mPrice" value="29.99" min="0" step="0.5" /></div>
+          <div><label for="mSales">预估月销(件)</label><input type="number" id="mSales" value="400" min="0" step="10" /></div>
+          <div><label for="mComp">竞争度(0-1)</label><input type="number" id="mComp" value="0.5" min="0" max="1" step="0.05" /></div>
+        </div>
+        <div class="flags">
+          <span style="color:var(--muted)">属性:</span>
+          <label><input type="checkbox" class="haz" value="battery" /> 含电池</label>
+          <label><input type="checkbox" class="haz" value="liquid" /> 液体</label>
+          <label><input type="checkbox" class="haz" value="sharp" /> 利器</label>
+          <label><input type="checkbox" id="mBrand" /> 品牌/侵权风险</label>
+        </div>
+        <button class="primary" id="runManual">测算</button>
+        <div class="hint">用真实询价参数直接算落地利润;品类选已知项才能触发对应认证要求。</div>
+      </div>
+
+      <!-- 批量对比 -->
+      <div class="panel" id="panel-compare">
+        <label>选择要对比的品类(可多选)</label>
+        <div class="checklist" id="cmpList"></div>
+        <button class="primary" id="runCompare">批量对比</button>
+        <div class="hint">批量默认用模板摘要(快、省 token);点某一行可展开看 LLM 详报。</div>
+      </div>
+    </div>
+
+    <div class="card" id="result">
+      <div class="empty">👈 选一个模式、填好条件后点击按钮,这里会显示结果。</div>
+    </div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let CATEGORIES = [];
+let lastSingle = null;
+let lastCompare = null;
+
+const VERDICT = {
+  "GO": { cls: "go", label: "可以做", icon: "✅" },
+  "CAUTION": { cls: "caution", label: "谨慎评估", icon: "⚠️" },
+  "NO-GO": { cls: "nogo", label: "不建议", icon: "❌" },
+};
+const COST_LABEL = {
+  supplier_cost: "供货成本", export_refund: "出口退税(返还)", first_leg_shipping: "头程运费",
+  platform_commission: "平台佣金", fulfillment: "履约费", advertising: "广告(ACoS)",
+  returns: "退货损耗", payment_fee: "收款手续费", import_tax: "进口税", total_cost: "成本合计",
+};
+
+function money(n) { return "$" + Number(n).toLocaleString(undefined, {maximumFractionDigits: 0}); }
+function pct(n) { return (Number(n) * 100).toFixed(1) + "%"; }
+function globals() {
+  return { market: $("market").value, budget: Number($("budget").value),
+    cny_per_usd: Number($("cny").value), use_llm: $("useLlm").checked };
+}
+
+async function loadCategories() {
+  try {
+    const data = await (await fetch("/api/categories")).json();
+    CATEGORIES = data.categories || [];
+    const dl = $("catlist"), quick = $("quick"), mcat = $("mCategory"), cmp = $("cmpList");
+    CATEGORIES.forEach(c => {
+      dl.appendChild(Object.assign(document.createElement("option"), { value: c }));
+      const b = document.createElement("span"); b.className = "chip"; b.textContent = c;
+      b.onclick = () => { $("category").value = c; }; quick.appendChild(b);
+      mcat.appendChild(Object.assign(document.createElement("option"), { value: c, textContent: c }));
+      const lab = document.createElement("label");
+      lab.innerHTML = `<input type="checkbox" class="cmp" value="${c}" checked> ${c}`;
+      cmp.appendChild(lab);
+    });
+    const st = $("llmState");
+    if (data.llm && data.llm.available) {
+      st.style.display = "inline-block"; st.textContent = "key 已配置 · " + (data.llm.model || "");
+      $("useLlm").checked = true;
+    } else {
+      st.style.display = "inline-block"; st.textContent = "未配置 key,将用模板";
+      st.style.background = "#f1f5f9"; st.style.color = "#64748b";
+    }
+  } catch (e) {}
+}
+
+function renderSingle(data) {
+  lastSingle = data; lastCompare = null;
+  const v = VERDICT[data.recommendation.verdict] || VERDICT["CAUTION"];
+  const p = data.scored_candidate.product, pr = data.profit, c = data.compliance, b = pr.breakdown;
+  let costRows = Object.keys(b).map(k => {
+    const val = b[k], isTotal = k === "total_cost";
+    return `<tr${isTotal ? ' style="font-weight:700"' : ''}><td>${COST_LABEL[k]||k}</td><td class="num ${val<0?'neg':''}">${val.toFixed(2)}</td></tr>`;
+  }).join("");
+  const alts = (data.ranked_alternatives||[]).map(a => `<span class="alt">${a.product.name} · 机会分 ${a.opportunity_score.toFixed(3)}</span>`).join("");
+  const certs = c.required_certifications.length ? `<div>需认证:<b>${c.required_certifications.join(", ")}</b></div>` : "";
+  const restr = c.restrictions.length ? `<div>限制:${c.restrictions.join("; ")}</div>` : "";
+  const tax = c.tax_obligations.length ? `<div>税务:${c.tax_obligations.join("; ")}</div>` : "";
+  const todos = c.todos.map(t => `<li>${t}</li>`).join("");
+
+  $("result").innerHTML = `
+    <div class="toolbar">
+      <button class="btn-ghost" onclick="exportJSON()">导出 JSON</button>
+      <button class="btn-ghost" onclick="exportMarkdown()">导出 Markdown</button>
+    </div>
+    <div class="verdict ${v.cls}">${v.icon} ${v.label}
+      <small>（${data.recommendation.verdict}）· ${p.name} · ${data.context.market}</small></div>
+    <ul class="reasons">${data.recommendation.reasons.map(r=>`<li>${r}</li>`).join("")}</ul>
+    <div class="metrics">
+      <div class="metric"><div class="v">${pct(pr.margin_pct)}</div><div class="k">利润率</div></div>
+      <div class="metric"><div class="v">$${pr.unit_profit.toFixed(2)}</div><div class="k">单件利润</div></div>
+      <div class="metric"><div class="v">${money(pr.monthly_profit)}</div><div class="k">预估月利润</div></div>
+      <div class="metric"><div class="v">${pct(pr.roi_pct)}</div><div class="k">ROI</div></div>
+    </div>
+    <div class="sec-title">成本构成(售价 $${pr.selling_price} · 建议首单 ${pr.suggested_first_order_qty} 件 / ${money(pr.first_order_cost)})</div>
+    <table>${costRows}</table>
+    <div class="sec-title">合规 <span class="pill ${c.status}">${c.status}${c.blocking?" · 阻断":""}</span></div>
+    <div style="font-size:13px;color:#334155">${certs}${restr}${tax}</div>
+    <ul class="todos">${todos}</ul>
+    ${alts ? `<div class="sec-title">其他候选</div><div class="alts">${alts}</div>` : ""}
+    <div class="sec-title">决策摘要</div>
+    <div class="summary"><div class="top"><span class="llm-badge" style="${data.llm_used?'':'background:#f1f5f9;color:#64748b'}">${data.llm_used?'LLM 增强':'模板生成'}</span></div>${data.summary}</div>`;
+}
+
+function renderCompare(data) {
+  lastCompare = data; lastSingle = null;
+  const rows = data.rows || [];
+  const body = rows.map(r => {
+    if (r.error) return `<tr><td>${r.category}</td><td colspan="7" style="color:var(--muted)">${r.error}</td></tr>`;
+    return `<tr class="clickable" onclick="drillDown('${r.category}')">
+      <td>${r.category}<div style="font-size:11px;color:var(--muted)">${r.product}</div></td>
+      <td><span class="pill ${r.verdict}">${r.verdict}</span></td>
+      <td class="num">${r.opportunity_score.toFixed(3)}</td>
+      <td class="num">${pct(r.margin_pct)}</td>
+      <td class="num">$${r.unit_profit.toFixed(2)}</td>
+      <td class="num">${money(r.monthly_profit)}</td>
+      <td class="num">${pct(r.roi_pct)}</td>
+      <td><span class="pill ${r.compliance}">${r.compliance}</span></td></tr>`;
+  }).join("");
+  $("result").innerHTML = `
+    <div class="toolbar">
+      <button class="btn-ghost" onclick="exportCSV()">导出 CSV</button>
+      <button class="btn-ghost" onclick="exportJSON()">导出 JSON</button>
+    </div>
+    <div class="sec-title">批量对比(${rows.length} 个品类,按机会分排序 · 点行看详情)</div>
+    <table>
+      <thead><tr><th>品类 / 商品</th><th>结论</th><th class="num">机会分</th><th class="num">利润率</th>
+        <th class="num">单件利润</th><th class="num">月利润</th><th class="num">ROI</th><th>合规</th></tr></thead>
+      <tbody>${body}</tbody>
+    </table>`;
+}
+
+async function post(url, payload) {
+  const res = await fetch(url, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "请求失败");
+  return data;
+}
+function loading() { $("result").innerHTML = `<div class="spinner"></div>`; }
+function showError(msg) { $("result").innerHTML = `<div class="error">${msg}</div>`; }
+
+async function runSingle() {
+  const category = $("category").value.trim();
+  if (!category) return showError("请先填写目标品类。");
+  loading();
+  try { renderSingle(await post("/api/analyze", { category, ...globals() })); }
+  catch (e) { showError(e.message); }
+}
+
+async function runManual() {
+  const category = $("mCategory").value;
+  const product = {
+    name: $("mName").value.trim(), supplier_cost_cny: Number($("mCost").value),
+    weight_kg: Number($("mWeight").value), target_price_usd: Number($("mPrice").value),
+    est_monthly_sales: Number($("mSales").value), competition_score: Number($("mComp").value),
+    hazmat: Array.from(document.querySelectorAll(".haz:checked")).map(x=>x.value),
+    brand_risk: $("mBrand").checked,
+  };
+  loading();
+  try { renderSingle(await post("/api/analyze", { category, product, ...globals() })); }
+  catch (e) { showError(e.message); }
+}
+
+async function runCompare() {
+  const categories = Array.from(document.querySelectorAll(".cmp:checked")).map(x=>x.value);
+  if (!categories.length) return showError("请至少选择一个品类。");
+  loading();
+  try { renderCompare(await post("/api/compare", { categories, ...globals() })); }
+  catch (e) { showError(e.message); }
+}
+
+async function drillDown(category) {
+  loading();
+  try { renderSingle(await post("/api/analyze", { category, ...globals() })); }
+  catch (e) { showError(e.message); }
+}
+
+/* ---- 导出 ---- */
+function download(name, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  URL.revokeObjectURL(a.href);
+}
+function exportJSON() {
+  const data = lastSingle || lastCompare; if (!data) return;
+  download("ftagents_report.json", JSON.stringify(data, null, 2), "application/json");
+}
+function exportMarkdown() {
+  const d = lastSingle; if (!d) return;
+  const p = d.scored_candidate.product, pr = d.profit, c = d.compliance;
+  let md = `# 选品决策报告:${p.name}\n\n`;
+  md += `- 市场:${d.context.market}\n- 结论:**${d.recommendation.verdict}**\n`;
+  md += `- 利润率:${pct(pr.margin_pct)} | 单件利润:$${pr.unit_profit} | 月利润:${money(pr.monthly_profit)} | ROI:${pct(pr.roi_pct)}\n`;
+  md += `- 合规:${c.status}${c.blocking?"(阻断)":""}\n\n`;
+  md += `## 理由\n` + d.recommendation.reasons.map(r=>`- ${r}`).join("\n") + `\n\n`;
+  md += `## 成本构成(美元)\n| 项目 | 金额 |\n|---|---|\n`;
+  Object.keys(pr.breakdown).forEach(k => md += `| ${COST_LABEL[k]||k} | ${pr.breakdown[k].toFixed(2)} |\n`);
+  md += `\n## 合规待办\n` + c.todos.map(t=>`- ${t}`).join("\n") + `\n\n`;
+  md += `## 摘要\n${d.summary}\n`;
+  download("ftagents_report.md", md, "text/markdown");
+}
+function exportCSV() {
+  const d = lastCompare; if (!d) return;
+  const head = ["品类","商品","结论","机会分","利润率","单件利润","月利润","ROI","合规"];
+  const lines = [head.join(",")];
+  (d.rows||[]).forEach(r => {
+    if (r.error) { lines.push([r.category,"",r.error,"","","","","",""].join(",")); return; }
+    lines.push([r.category, r.product, r.verdict, r.opportunity_score,
+      (r.margin_pct*100).toFixed(1)+"%", r.unit_profit, r.monthly_profit,
+      (r.roi_pct*100).toFixed(1)+"%", r.compliance].join(","));
+  });
+  download("ftagents_compare.csv", "\ufeff" + lines.join("\n"), "text/csv");
+}
+
+/* ---- tabs ---- */
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(x => x.classList.remove("active"));
+  t.classList.add("active");
+  $("panel-" + t.dataset.tab).classList.add("active");
+});
+
+$("runSingle").onclick = runSingle;
+$("runManual").onclick = runManual;
+$("runCompare").onclick = runCompare;
+async function loadFx() {
+  try {
+    const fx = await (await fetch("/api/fx")).json();
+    if (fx && fx.cny_per_usd) {
+      $("cny").value = fx.cny_per_usd;
+      $("fxNote").textContent = fx.live ? `实时 · ${fx.source}` : "默认(取汇率失败)";
+    }
+  } catch (e) {}
+}
+
+$("category").addEventListener("keydown", e => { if (e.key === "Enter") runSingle(); });
+loadCategories();
+loadFx();
+</script>
+</body>
+</html>

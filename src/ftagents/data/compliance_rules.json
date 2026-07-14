@@ -1,0 +1,57 @@
+{
+  "categories": {
+    "bluetooth earbuds": {
+      "certifications": { "US": ["FCC"], "EU": ["CE", "RoHS"], "UK": ["UKCA"] },
+      "restricted": false,
+      "notes": "无线电设备需无线电认证"
+    },
+    "led strip light": {
+      "certifications": { "US": ["FCC"], "EU": ["CE", "RoHS"], "UK": ["UKCA"] },
+      "restricted": false,
+      "notes": "电子电气产品"
+    },
+    "yoga mat": {
+      "certifications": { "US": [], "EU": ["REACH"], "UK": ["REACH"] },
+      "restricted": false,
+      "notes": "材料环保合规(REACH)"
+    },
+    "kitchen knife set": {
+      "certifications": { "US": [], "EU": [] },
+      "restricted": true,
+      "restriction_note": "利器类:部分平台需资质、部分国家/地区限制邮寄与销售",
+      "notes": "刀具"
+    },
+    "kids building blocks": {
+      "certifications": { "US": ["CPSIA", "CPC"], "EU": ["CE", "EN71"], "UK": ["UKCA", "EN71"] },
+      "restricted": false,
+      "notes": "儿童玩具强监管,需第三方检测报告"
+    },
+    "silicone kitchen utensils": {
+      "certifications": { "US": ["FDA"], "EU": ["LFGB"], "UK": ["LFGB"] },
+      "restricted": false,
+      "notes": "食品接触材料"
+    }
+  },
+  "hazmat": {
+    "battery": {
+      "status": "YELLOW",
+      "todos": [
+        "提供锂电池 UN38.3 测试报告与 MSDS",
+        "走电池专线或海运,国际空运受限"
+      ]
+    },
+    "liquid": {
+      "status": "YELLOW",
+      "todos": ["提供 MSDS,确认是否属危险品,选择合规物流渠道"]
+    },
+    "sharp": {
+      "status": "YELLOW",
+      "todos": ["确认目标平台利器类目准入与包装安全要求"]
+    }
+  },
+  "market_tax": {
+    "US": ["按州注册并申报销售税(sales tax)"],
+    "EU": ["注册 VAT;低值订单可用 IOSS 申报进口 VAT"],
+    "UK": ["注册 UK VAT"]
+  }
+}
